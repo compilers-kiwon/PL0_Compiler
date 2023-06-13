@@ -24,8 +24,7 @@ int main(void)
     std::cout<<"Enter source file name :\n>>";
     std::cin>>file_name;
 
-    if( open_source_file(file_name) && compile() )
-    {
+    if (open_source_file(file_name) && compile()) {
         execute();
         close_source_file();
     }

@@ -1,6 +1,6 @@
 CC = g++
 CXXFLAGS = -Wall -I ./Inc
-OBJS = main.o compile.o codegen.o
+OBJS = codegen.o compile.o error.o lexer.o main.o parser.o table.o
 TARGET = PL0.out
 
 all : $(TARGET)
