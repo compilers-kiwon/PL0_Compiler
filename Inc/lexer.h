@@ -3,6 +3,7 @@
 
 extern int  getNextTok(void);
 extern std::string getTokStr(void);
+extern int getTokNumVal(void);
 
 enum Token {
     tok_begin = -1,

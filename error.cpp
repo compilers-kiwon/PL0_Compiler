@@ -8,6 +8,9 @@
 #include    <vector>
 #include    <iostream>
 
+#include    "error.h"
+#include    "parser.h"
+
 static int  errorNo;
 
 int getNumOfErrors(void)
@@ -18,4 +21,10 @@ int getNumOfErrors(void)
 int incNumOfErrors(void)
 {
     return  ++errorNo;
+}
+
+std::unique_ptr<AST>    printError(const char* str)
+{
+    std::cout<<str<<'\n';
+    return  nullptr;
 }

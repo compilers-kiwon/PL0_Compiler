@@ -17,8 +17,8 @@
 int compile(void)
 {
     token = getNextTok();
-    blockBegin(FIRSTADDR);
-    block(0);
+  
+    auto P = parse();
 
     int num_of_errors = getNumOfErrors();
 

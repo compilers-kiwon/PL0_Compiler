@@ -10,15 +10,486 @@
 
 #include    "lexer.h"
 #include    "parser.h"
+#include    "error.h"
 
 int token;
 
-int block(int pIndex)
-{
-    do {
-        std::cout<<token<<","<<getTokStr()<<'\n';
-        token = getNextTok();
-    } while (token!=tok_eof && token!=tok_none);
+static std::unique_ptr<AST> parseProgram(void);
+static std::unique_ptr<AST> ParseBlock(void);
+static std::unique_ptr<AST> ParseDeclList(void);
+static std::unique_ptr<AST> ParseStatement(void);
+static std::unique_ptr<AST> ParseDecl(void);
+static std::unique_ptr<AST> ParseConstDecl(void);
+static std::unique_ptr<AST> ParseNumberList(void);
+static std::unique_ptr<AST> ParseVarDecl(void);
+static std::unique_ptr<AST> ParseIdentList(void);
+static std::unique_ptr<AST> ParseFuncDecl(void);
+static std::unique_ptr<AST> ParseOptParList(void);
+static std::unique_ptr<AST> ParseParList(void);
+static std::unique_ptr<AST> ParseExpression(void);
+static std::unique_ptr<AST> ParseTerm(void);
+static std::unique_ptr<AST> ParseFactor(void);
+static std::unique_ptr<AST> ParseExpList(void);
+static std::unique_ptr<AST> ParseFactList(void);
+static std::unique_ptr<AST> ParseTermList(void);
+static std::unique_ptr<AST> ParseStateList(void);
+static std::unique_ptr<AST> ParseCondition(void);
 
-    return  1;
+std::unique_ptr<AST> parse(void)
+{
+    return  std::move(parseProgram());
+}
+
+/// program ::= block '.'
+static std::unique_ptr<AST> parseProgram(void)
+{
+    auto B = ParseBlock();
+
+    if (!B) return printError("Cannot find block!!");
+    if (token != tok_period) return printError("Expected '.' at end of program");
+
+    token = getNextTok();
+
+    return  std::make_unique<ProgramAST>(std::move(B));
+}
+
+/// block ::= declList statement
+static std::unique_ptr<AST> ParseBlock(void)
+{
+    auto D = ParseDeclList();
+    auto S = ParseStatement();
+
+    return  std::make_unique<BlockAST>(std::move(D),std::move(S));
+}
+
+/// declList 
+///    ::= <empty>
+///    ::= decl decList
+static std::unique_ptr<AST> ParseDeclList(void)
+{
+    auto D = ParseDecl();
+
+    if (!D) return nullptr;
+    return std::make_unique<DeclListAST>(std::move(D),ParseDeclList());
+}
+
+/// decl
+///    ::= constDecl
+///    ::= varDecl
+///    ::= funcDecl
+static std::unique_ptr<AST> ParseDecl(void)
+{
+    auto D = ParseConstDecl();
+
+    if (!D) D = ParseVarDecl();
+    if (!D) D = ParseFuncDecl();
+    if (!D) return nullptr;
+    
+    return std::make_unique<DeclAST>(std::move(D));
+}
+
+/// funcDecl ::= FUNCTION IDENT '('  optParList ')' block ';'
+static std::unique_ptr<AST> ParseFuncDecl(void)
+{
+    std::string name;
+
+    if(token != tok_func) return nullptr;
+    token = getNextTok();
+
+    if (token != tok_id) return printError("Expected ID");
+    
+    name = getTokStr();
+    token = getNextTok();
+
+    if (token != tok_lparen) return printError("Expected (");
+
+    token = getNextTok();
+
+    auto O = ParseOptParList();
+    if (token != tok_rparen) return printError("Expected )");
+
+    token = getNextTok();
+    auto B = ParseBlock();
+
+    if (!B) return nullptr;
+    if (token != tok_semicolon) return printError("Expected ;");
+    
+    token = getNextTok();
+    return std::make_unique<FuncDeclAST>(name,std::move(O),std::move(B));
+}
+
+/// optParList
+///    ::= <empty>
+///    ::= parList
+static std::unique_ptr<AST> ParseOptParList(void)
+{
+    auto P = ParseParList();
+    if (!P) return nullptr;
+
+    return std::make_unique<OptParListAST>(std::move(P));
+}
+
+/// parList
+///    ::= IDENT
+///    ::= parList COMMA IDENT
+static std::unique_ptr<AST> ParseParList(void)
+{
+    std::string name;
+
+    if (token != tok_id) return nullptr;
+
+    name = getTokStr();
+    token = getNextTok();
+
+    if (token == tok_comma) {
+        token = getNextTok();
+        
+        auto P = ParseParList();
+        if (!P) return nullptr;
+
+        return std::make_unique<ParListAST>(name,std::move(P));
+    }
+
+    return std::make_unique<ParListAST>(name,nullptr);
+}
+
+/// varDecl ::= VAR identList ';'
+static std::unique_ptr<AST> ParseVarDecl(void)
+{
+    if (token != tok_var) return nullptr;
+    token = getNextTok();
+
+    auto IL = ParseIdentList();
+    if (!IL) return nullptr;
+
+    if (token != tok_semicolon) return nullptr;
+    token = getNextTok();
+
+    return std::make_unique<VarDeclAST>(std::move(IL));
+}
+
+/// identList
+///    ::= IDENT
+///    ::= identList COMMA IDENT
+static std::unique_ptr<AST> ParseIdentList(void)
+{
+    std::string name;
+
+    if (token != tok_id) return nullptr;
+
+    name = getTokStr();
+    token = getNextTok();
+
+    if (token == tok_comma) {
+        token = getNextTok();
+        auto I = ParseIdentList();
+
+        if (!I) return nullptr;
+        return std::make_unique<IdentListAST>(name,std::move(I));
+    }
+
+    return std::make_unique<IdentListAST>(name,nullptr);
+}
+
+/// constDecl ::= CONST numberList ';'
+static std::unique_ptr<AST> ParseConstDecl(void)
+{
+    if (token != tok_const) return nullptr;
+    token = getNextTok();
+
+    auto NL = ParseNumberList();
+    if (!NL) return nullptr;
+
+    if (token != tok_semicolon) return nullptr;
+    token = getNextTok();
+
+    return std::make_unique<ConstDeclAST>(std::move(NL));
+}
+
+/// numberList
+///    ::= IDENT EQ NUMBER
+///    ::= numberList COMMA IDENT EQ NUMBER
+static std::unique_ptr<AST> ParseNumberList(void)
+{
+    std::string name;
+    int val;
+
+    if (token != tok_id) return nullptr;
+    name = getTokStr();
+    
+    token = getNextTok();
+    if (token != tok_equal) return nullptr;
+
+    token = getNextTok();
+    if (token != tok_num) return nullptr;
+
+    val = getTokNumVal();
+    token = getNextTok();
+
+    if (token == tok_comma) {
+        token = getNextTok();
+        
+        auto N = ParseNumberList();
+        if (!N) return nullptr;
+
+        return std::make_unique<NumberListAST>(name,val,std::move(N));
+    }
+
+    return std::make_unique<NumberListAST>(name,val,nullptr);
+}
+
+/// statement
+///    ::= <empty>
+///    ::= IDENT COLOEQ expression
+///    ::= BEGINN statement stateList END
+///    ::= IF condition THEN statement
+///    ::= WHILE condition DO statement
+///    ::= RETURN expression
+///    ::= WRITE expression
+///    ::= WRITELN
+static std::unique_ptr<AST> ParseStatement(void)
+{
+    std::string name;
+
+    switch (token) {
+        case  tok_id: {
+            name = getTokStr();
+            token = getNextTok();
+
+            if (token != tok_assign) return nullptr;
+            token = getNextTok();
+
+            auto E = ParseExpression();
+            if (!E) return nullptr;
+
+            return std::make_unique<StatementAST>(tok_id,name,std::move(E),nullptr,nullptr,nullptr);
+        }
+        case  tok_begin: {
+            token = getNextTok();
+
+            auto S = ParseStatement();
+            auto SL = ParseStateList();
+            
+            if (token != tok_end) return nullptr;
+            token = getNextTok();
+            
+            return std::make_unique<StatementAST>(tok_begin,"",nullptr,nullptr,std::move(S),std::move(SL));
+        }
+        case  tok_if: {
+            token = getNextTok();
+            auto C = ParseCondition();
+
+            if (!C) return nullptr;
+            if (token != tok_then) return nullptr;
+            
+            token = getNextTok();
+            auto S = ParseStatement();
+
+            return std::make_unique<StatementAST>(tok_if,"",nullptr,std::move(C),std::move(S),nullptr);
+        }
+        case  tok_while: {
+            token = getNextTok();
+            auto C = ParseCondition();
+
+            if (!C) return nullptr;
+            if (token != tok_do) return nullptr;
+            
+            token = getNextTok();
+            auto S = ParseStatement();
+            
+            return std::make_unique<StatementAST>(tok_while,"",nullptr,std::move(C),std::move(S),nullptr);
+        }
+        case  tok_ret: {
+            token = getNextTok();
+            auto E = ParseExpression();
+            
+            if (!E) return nullptr;
+            return std::make_unique<StatementAST>(tok_ret,"",std::move(E),nullptr,nullptr,nullptr);
+        }
+        case  tok_write: {
+            token = getNextTok();
+            auto E = ParseExpression();
+
+            if (!E) return nullptr;
+            return std::make_unique<StatementAST>(tok_write,"",std::move(E),nullptr,nullptr,nullptr);
+        }
+        case  tok_writeln: {
+            token = getNextTok();
+            return std::make_unique<StatementAST>(tok_writeln,"",nullptr,nullptr,nullptr,nullptr);
+        }
+        default:
+            break;
+    }
+
+    return nullptr;
+}
+
+/// expression
+///     ::= '-'  term termList
+///     ::= term  termList
+static std::unique_ptr<AST> ParseExpression(void)
+{
+    if (token == tok_minus) {
+        token = getNextTok();
+
+        auto T = ParseTerm();
+        if (!T) return nullptr;
+
+        auto TL = ParseTermList();
+        return std::make_unique<ExpressionAST>('-',std::move(T),std::move(TL));
+    }
+
+    auto T = ParseTerm();
+    if (!T) return nullptr;
+
+    auto TL = ParseTermList();
+    return std::make_unique<ExpressionAST>(0,std::move(T),std::move(TL));
+}
+
+/// term ::= factor factList
+static std::unique_ptr<AST> ParseTerm(void)
+{
+    auto F = ParseFactor();
+    if (!F) return nullptr;
+
+    return std::make_unique<TermAST>(std::move(F),ParseFactList());
+}
+
+/// factor
+///    ::= IDENT
+///    ::= NUMBER
+///    ::= IDENT '(' expList ')'
+///    ::= '(' expression ')'
+static std::unique_ptr<AST> ParseFactor(void)
+{
+    if (token == tok_id) {
+        std::string name = getTokStr();
+
+        token = getNextTok();
+        if (token != tok_lparen) 
+            return std::make_unique<FactorAST>(name,0.0,nullptr,nullptr);
+
+        token = getNextTok();
+   
+        auto EL = ParseExpList();
+        if (!EL || token!=tok_rparen) return nullptr;
+    
+        token = getNextTok();
+        return std::make_unique<FactorAST>(name,0.0f,std::move(EL),nullptr);
+    }
+
+    if (token == tok_num) {
+        token = getNextTok();
+        return std::make_unique<FactorAST>("",getTokNumVal(),nullptr,nullptr);
+    }
+
+    if (token == tok_lparen) {
+        token = getNextTok();
+    
+        auto E = ParseExpression();
+        if(!E || token!=tok_rparen) return nullptr;
+
+        token = getNextTok();
+        return std::make_unique<FactorAST>("",0.0,nullptr,std::move(E));
+    }
+
+    return nullptr;
+}
+
+/// expList
+///    ::= expression
+///    ::= expList ',' expression
+static std::unique_ptr<AST> ParseExpList(void)
+{
+    auto E = ParseExpression();
+    if (!E) return nullptr;
+
+    if (token != tok_comma)
+        return std::make_unique<ExpListAST>(nullptr,std::move(E));
+
+    token = getNextTok();
+    return std::make_unique<ExpListAST>(ParseExpList(),std::move(E));
+}
+
+/// factList
+///    ::= <empty>
+///    ::= factList '*' factor
+///    ::= factList '/' factor
+static std::unique_ptr<AST> ParseFactList(void)
+{
+    int op_tok = token;
+
+    if (op_tok!=tok_mult && op_tok!=tok_div) return nullptr;
+    token = getNextTok();
+
+    auto F = ParseFactor();
+    if (!F) return nullptr;
+
+    return std::make_unique<FactListAST>(op_tok,std::move(F),ParseFactList());
+}
+
+/// termList
+///    ::= <empty>
+///    ::= termList '+' term
+///    ::= termList '-' term
+static std::unique_ptr<AST> ParseTermList(void)
+{
+    int op_tok = token;
+
+    if (op_tok!=tok_plus && op_tok!=tok_minus) return nullptr;
+    token = getNextTok();
+
+    auto T = ParseTerm();
+    if (!T) return nullptr;
+
+    return std::make_unique<TermListAST>(op_tok,std::move(T),ParseTermList());
+}
+
+/// stateList
+///    ::= <empty>
+///    ::= stateList ';' statement
+static std::unique_ptr<AST> ParseStateList(void)
+{
+    if (token != tok_semicolon) return nullptr;
+    token = getNextTok();
+
+    auto S = ParseStatement();
+    return std::make_unique<StateListAST>(ParseStateList(),std::move(S));
+}
+
+/// condition
+///    ::= ODD expression
+///    ::= expression EQ expression
+///    ::= expression NOTEQ expression
+///    ::= expression LT expression
+///    ::= expression GT expression
+///    ::= expression LE expression
+///    ::= expression GE expression
+static std::unique_ptr<AST> ParseCondition(void)
+{
+    if (token == tok_odd) {
+        token = getNextTok();
+        
+        auto LHS = ParseExpression();
+        if (!LHS) return nullptr;
+
+        return std::make_unique<ConditionAST>(tok_odd,std::move(LHS),nullptr);
+    }
+
+    auto LHS = ParseExpression();
+    if (!LHS) return nullptr;
+
+    int op_tok = token;
+
+    if (op_tok!=tok_equal && op_tok!=tok_notequal 
+            && op_tok!=tok_less && op_tok!=tok_greater 
+            && op_tok!=tok_lessequal && op_tok!=tok_greaterequal)
+        return printError("Expected conditional operator");
+
+    token = getNextTok();
+
+    auto RHS = ParseExpression();
+    if (!RHS) return nullptr;
+
+    return std::make_unique<ConditionAST>(op_tok,std::move(LHS),std::move(RHS));
 }

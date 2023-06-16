@@ -19,6 +19,7 @@ static int  getTok(void);
 
 int getNextTok(void) { return (cur_tok=getTok()); }
 std::string getTokStr(void) { return str; }
+int getTokNumVal(void) { return numVal; }
 
 static std::map<std::string,int>  keywordTable = {
     {"begin",tok_begin},{"end",tok_end},{"if",tok_if},{"then",tok_then},
