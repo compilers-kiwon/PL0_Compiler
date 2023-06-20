@@ -19,10 +19,9 @@ int compile(void)
     token = getNextTok();
   
     auto P = parse();
-
     int num_of_errors = getNumOfErrors();
 
-    if (num_of_errors!=0) {
+    if (!P || num_of_errors!=0) {
         std::cout<<num_of_errors<<" errors!!\n";
     }
 

@@ -25,6 +25,7 @@ int main(void)
     std::cin>>file_name;
 
     if (open_source_file(file_name) && compile()) {
+        std::cout<<"[Program is compiled well.]\n";
         execute();
         close_source_file();
     }

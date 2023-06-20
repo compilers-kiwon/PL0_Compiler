@@ -26,5 +26,7 @@ int incNumOfErrors(void)
 std::unique_ptr<AST>    printError(const char* str)
 {
     std::cout<<str<<'\n';
+    incNumOfErrors();
+    
     return  nullptr;
 }

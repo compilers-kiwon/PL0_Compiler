@@ -3,6 +3,13 @@
 
 extern int  token;
 
+enum {
+  CONST = 0,
+  VAR = 1,
+  FUNC = 2,
+  MAX_SYMBOL_TYPE = 3
+};
+
 /// AST - Base class for all expression nodes.
 class AST {
 public:

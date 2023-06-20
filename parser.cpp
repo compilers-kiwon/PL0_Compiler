@@ -16,16 +16,16 @@ int token;
 
 static std::unique_ptr<AST> parseProgram(void);
 static std::unique_ptr<AST> ParseBlock(void);
-static std::unique_ptr<AST> ParseDeclList(void);
+static std::unique_ptr<AST> ParseDeclList(std::vector<std::string>&);
 static std::unique_ptr<AST> ParseStatement(void);
-static std::unique_ptr<AST> ParseDecl(void);
-static std::unique_ptr<AST> ParseConstDecl(void);
-static std::unique_ptr<AST> ParseNumberList(void);
-static std::unique_ptr<AST> ParseVarDecl(void);
-static std::unique_ptr<AST> ParseIdentList(void);
-static std::unique_ptr<AST> ParseFuncDecl(void);
-static std::unique_ptr<AST> ParseOptParList(void);
-static std::unique_ptr<AST> ParseParList(void);
+static std::unique_ptr<AST> ParseDecl(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseConstDecl(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseNumberList(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseVarDecl(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseIdentList(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseFuncDecl(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseOptParList(std::vector<std::string>&);
+static std::unique_ptr<AST> ParseParList(std::vector<std::string>&);
 static std::unique_ptr<AST> ParseExpression(void);
 static std::unique_ptr<AST> ParseTerm(void);
 static std::unique_ptr<AST> ParseFactor(void);
@@ -34,6 +34,26 @@ static std::unique_ptr<AST> ParseFactList(void);
 static std::unique_ptr<AST> ParseTermList(void);
 static std::unique_ptr<AST> ParseStateList(void);
 static std::unique_ptr<AST> ParseCondition(void);
+
+static std::map<std::string,std::vector<int>>   symTab;
+
+static bool is_available_symbol(std::string& name,int type)
+{
+    if (symTab.find(name)==symTab.end() ||
+            symTab[name].empty() || symTab[name].back()!=(1<<type))
+        return  false;
+
+    return  true;
+}
+
+static int  removeSymbols(const std::vector<std::string>& sym)
+{
+    for (size_t i=0;i<sym.size();i++) {
+        symTab[sym[i]].pop_back();
+    }
+
+    return  0;
+}
 
 std::unique_ptr<AST> parse(void)
 {
@@ -49,6 +69,7 @@ static std::unique_ptr<AST> parseProgram(void)
     if (token != tok_period) return printError("Expected '.' at end of program");
 
     token = getNextTok();
+    if (token != tok_eof) return printError("Program should have been finished.");
 
     return  std::make_unique<ProgramAST>(std::move(B));
 }
@@ -56,40 +77,43 @@ static std::unique_ptr<AST> parseProgram(void)
 /// block ::= declList statement
 static std::unique_ptr<AST> ParseBlock(void)
 {
-    auto D = ParseDeclList();
+    std::vector<std::string>    localSymbols;
+
+    auto D = ParseDeclList(localSymbols);
     auto S = ParseStatement();
 
+    removeSymbols(localSymbols);
     return  std::make_unique<BlockAST>(std::move(D),std::move(S));
 }
 
 /// declList 
 ///    ::= <empty>
 ///    ::= decl decList
-static std::unique_ptr<AST> ParseDeclList(void)
+static std::unique_ptr<AST> ParseDeclList(std::vector<std::string>& sym)
 {
-    auto D = ParseDecl();
+    auto D = ParseDecl(sym);
 
     if (!D) return nullptr;
-    return std::make_unique<DeclListAST>(std::move(D),ParseDeclList());
+    return std::make_unique<DeclListAST>(std::move(D),ParseDeclList(sym));
 }
 
 /// decl
 ///    ::= constDecl
 ///    ::= varDecl
 ///    ::= funcDecl
-static std::unique_ptr<AST> ParseDecl(void)
+static std::unique_ptr<AST> ParseDecl(std::vector<std::string>& sym)
 {
-    auto D = ParseConstDecl();
+    auto D = ParseConstDecl(sym);
 
-    if (!D) D = ParseVarDecl();
-    if (!D) D = ParseFuncDecl();
+    if (!D) D = ParseVarDecl(sym);
+    if (!D) D = ParseFuncDecl(sym);
     if (!D) return nullptr;
     
     return std::make_unique<DeclAST>(std::move(D));
 }
 
 /// funcDecl ::= FUNCTION IDENT '('  optParList ')' block ';'
-static std::unique_ptr<AST> ParseFuncDecl(void)
+static std::unique_ptr<AST> ParseFuncDecl(std::vector<std::string>& sym)
 {
     std::string name;
 
@@ -101,11 +125,14 @@ static std::unique_ptr<AST> ParseFuncDecl(void)
     name = getTokStr();
     token = getNextTok();
 
+    symTab[name].push_back(1<<FUNC);
+    sym.push_back(name);
+
     if (token != tok_lparen) return printError("Expected (");
 
     token = getNextTok();
 
-    auto O = ParseOptParList();
+    auto O = ParseOptParList(sym);
     if (token != tok_rparen) return printError("Expected )");
 
     token = getNextTok();
@@ -115,15 +142,16 @@ static std::unique_ptr<AST> ParseFuncDecl(void)
     if (token != tok_semicolon) return printError("Expected ;");
     
     token = getNextTok();
+
     return std::make_unique<FuncDeclAST>(name,std::move(O),std::move(B));
 }
 
 /// optParList
 ///    ::= <empty>
 ///    ::= parList
-static std::unique_ptr<AST> ParseOptParList(void)
+static std::unique_ptr<AST> ParseOptParList(std::vector<std::string>& sym)
 {
-    auto P = ParseParList();
+    auto P = ParseParList(sym);
     if (!P) return nullptr;
 
     return std::make_unique<OptParListAST>(std::move(P));
@@ -132,7 +160,7 @@ static std::unique_ptr<AST> ParseOptParList(void)
 /// parList
 ///    ::= IDENT
 ///    ::= parList COMMA IDENT
-static std::unique_ptr<AST> ParseParList(void)
+static std::unique_ptr<AST> ParseParList(std::vector<std::string>& sym)
 {
     std::string name;
 
@@ -141,10 +169,13 @@ static std::unique_ptr<AST> ParseParList(void)
     name = getTokStr();
     token = getNextTok();
 
+    symTab[name].push_back(1<<VAR);
+    sym.push_back(name);
+
     if (token == tok_comma) {
         token = getNextTok();
         
-        auto P = ParseParList();
+        auto P = ParseParList(sym);
         if (!P) return nullptr;
 
         return std::make_unique<ParListAST>(name,std::move(P));
@@ -154,12 +185,12 @@ static std::unique_ptr<AST> ParseParList(void)
 }
 
 /// varDecl ::= VAR identList ';'
-static std::unique_ptr<AST> ParseVarDecl(void)
+static std::unique_ptr<AST> ParseVarDecl(std::vector<std::string>& sym)
 {
     if (token != tok_var) return nullptr;
     token = getNextTok();
 
-    auto IL = ParseIdentList();
+    auto IL = ParseIdentList(sym);
     if (!IL) return nullptr;
 
     if (token != tok_semicolon) return nullptr;
@@ -171,7 +202,7 @@ static std::unique_ptr<AST> ParseVarDecl(void)
 /// identList
 ///    ::= IDENT
 ///    ::= identList COMMA IDENT
-static std::unique_ptr<AST> ParseIdentList(void)
+static std::unique_ptr<AST> ParseIdentList(std::vector<std::string>& sym)
 {
     std::string name;
 
@@ -180,9 +211,12 @@ static std::unique_ptr<AST> ParseIdentList(void)
     name = getTokStr();
     token = getNextTok();
 
+    symTab[name].push_back(1<<VAR);
+    sym.push_back(name);    
+
     if (token == tok_comma) {
         token = getNextTok();
-        auto I = ParseIdentList();
+        auto I = ParseIdentList(sym);
 
         if (!I) return nullptr;
         return std::make_unique<IdentListAST>(name,std::move(I));
@@ -192,12 +226,12 @@ static std::unique_ptr<AST> ParseIdentList(void)
 }
 
 /// constDecl ::= CONST numberList ';'
-static std::unique_ptr<AST> ParseConstDecl(void)
+static std::unique_ptr<AST> ParseConstDecl(std::vector<std::string>& sym)
 {
     if (token != tok_const) return nullptr;
     token = getNextTok();
 
-    auto NL = ParseNumberList();
+    auto NL = ParseNumberList(sym);
     if (!NL) return nullptr;
 
     if (token != tok_semicolon) return nullptr;
@@ -209,15 +243,19 @@ static std::unique_ptr<AST> ParseConstDecl(void)
 /// numberList
 ///    ::= IDENT EQ NUMBER
 ///    ::= numberList COMMA IDENT EQ NUMBER
-static std::unique_ptr<AST> ParseNumberList(void)
+static std::unique_ptr<AST> ParseNumberList(std::vector<std::string>& sym)
 {
     std::string name;
     int val;
 
     if (token != tok_id) return nullptr;
-    name = getTokStr();
     
+    name = getTokStr();
     token = getNextTok();
+
+    symTab[name].push_back(1<<CONST);
+    sym.push_back(name);
+    
     if (token != tok_equal) return nullptr;
 
     token = getNextTok();
@@ -229,7 +267,7 @@ static std::unique_ptr<AST> ParseNumberList(void)
     if (token == tok_comma) {
         token = getNextTok();
         
-        auto N = ParseNumberList();
+        auto N = ParseNumberList(sym);
         if (!N) return nullptr;
 
         return std::make_unique<NumberListAST>(name,val,std::move(N));
@@ -254,9 +292,11 @@ static std::unique_ptr<AST> ParseStatement(void)
     switch (token) {
         case  tok_id: {
             name = getTokStr();
+            if (!is_available_symbol(name,VAR)) {std::cout<<name<<'\n';return printError("L-value should be a variable");}
+
             token = getNextTok();
 
-            if (token != tok_assign) return nullptr;
+            if (token != tok_assign) return printError("Expected :=");
             token = getNextTok();
 
             auto E = ParseExpression();
@@ -366,8 +406,15 @@ static std::unique_ptr<AST> ParseFactor(void)
         std::string name = getTokStr();
 
         token = getNextTok();
-        if (token != tok_lparen) 
+        if (token != tok_lparen) {
+            if (!is_available_symbol(name,VAR) &&
+                    !is_available_symbol(name,CONST)){std::cout<<name<<'\n';
+                return  printError("There is no such a variable or constant");}
             return std::make_unique<FactorAST>(name,0.0,nullptr,nullptr);
+        }
+
+        if (!is_available_symbol(name,FUNC))
+            return  printError("There is no such a callee");
 
         token = getNextTok();
    
