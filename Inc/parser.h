@@ -40,11 +40,10 @@ public:
 ///    ::= <empty>
 ///    ::= declList decl
 class DeclListAST : public AST {
-  std::unique_ptr<AST> declList,decl;
-
+  std::vector<std::unique_ptr<AST>>  declList;
 public:
-  DeclListAST(std::unique_ptr<AST> declList,std::unique_ptr<AST> decl)
-    : declList(std::move(declList)), decl(std::move(decl)) {}
+  DeclListAST(std::vector<std::unique_ptr<AST>> declList)
+    : declList(std::move(declList)) {}
 };
 
 /// DeclAST

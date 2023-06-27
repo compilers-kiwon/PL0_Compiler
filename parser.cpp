@@ -91,10 +91,13 @@ static std::unique_ptr<AST> ParseBlock(void)
 ///    ::= decl decList
 static std::unique_ptr<AST> ParseDeclList(std::vector<std::string>& sym)
 {
-    auto D = ParseDecl(sym);
+    std::vector<std::unique_ptr<AST>> declList;
 
-    if (!D) return nullptr;
-    return std::make_unique<DeclListAST>(std::move(D),ParseDeclList(sym));
+    for(auto D=ParseDecl(sym);D!=nullptr;D=ParseDecl(sym)) {
+        declList.push_back(std::move(D));
+    }
+
+    return std::make_unique<DeclListAST>(std::move(declList));
 }
 
 /// decl
