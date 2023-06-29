@@ -37,6 +37,9 @@ static std::unique_ptr<AST> ParseCondition(void);
 
 static std::map<std::string,std::vector<int>>   symTab;
 
+#define add_new_symbol(name,type,buffer) \
+    (symTab[(name)].push_back(1<<(type)),(buffer).push_back((name)))
+
 static bool is_available_symbol(std::string& name,int type)
 {
     if (symTab.find(name)==symTab.end() ||
@@ -128,9 +131,7 @@ static std::unique_ptr<AST> ParseFuncDecl(std::vector<std::string>& sym)
     name = getTokStr();
     token = getNextTok();
 
-    symTab[name].push_back(1<<FUNC);
-    sym.push_back(name);
-
+    add_new_symbol(name,FUNC,sym);
     if (token != tok_lparen) return printError("Expected (");
 
     token = getNextTok();
@@ -171,8 +172,7 @@ static std::unique_ptr<AST> ParseParList(std::vector<std::string>& sym)
     while (token == tok_id) {
         name = getTokStr();
 
-        symTab[name].push_back(1<<VAR);
-        sym.push_back(name);
+        add_new_symbol(name,VAR,sym);
         parList.push_back(name);
 
         if ((token=getNextTok()) != tok_comma) break;
@@ -209,8 +209,7 @@ static std::unique_ptr<AST> ParseIdentList(std::vector<std::string>& sym)
     name = getTokStr();
     token = getNextTok();
 
-    symTab[name].push_back(1<<VAR);
-    sym.push_back(name);    
+    add_new_symbol(name,VAR,sym);
 
     if (token == tok_comma) {
         token = getNextTok();
@@ -251,9 +250,7 @@ static std::unique_ptr<AST> ParseNumberList(std::vector<std::string>& sym)
     name = getTokStr();
     token = getNextTok();
 
-    symTab[name].push_back(1<<CONST);
-    sym.push_back(name);
-    
+    add_new_symbol(name,CONST,sym);
     if (token != tok_equal) return nullptr;
 
     token = getNextTok();
