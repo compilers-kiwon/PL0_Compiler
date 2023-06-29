@@ -166,25 +166,20 @@ static std::unique_ptr<AST> ParseOptParList(std::vector<std::string>& sym)
 static std::unique_ptr<AST> ParseParList(std::vector<std::string>& sym)
 {
     std::string name;
+    std::vector<std::string> parList;
 
-    if (token != tok_id) return nullptr;
+    while (token == tok_id) {
+        name = getTokStr();
 
-    name = getTokStr();
-    token = getNextTok();
+        symTab[name].push_back(1<<VAR);
+        sym.push_back(name);
+        parList.push_back(name);
 
-    symTab[name].push_back(1<<VAR);
-    sym.push_back(name);
-
-    if (token == tok_comma) {
+        if ((token=getNextTok()) != tok_comma) break;
         token = getNextTok();
-        
-        auto P = ParseParList(sym);
-        if (!P) return nullptr;
-
-        return std::make_unique<ParListAST>(name,std::move(P));
     }
 
-    return std::make_unique<ParListAST>(name,nullptr);
+    return std::make_unique<ParListAST>(parList);
 }
 
 /// varDecl ::= VAR identList ';'

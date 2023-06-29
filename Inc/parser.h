@@ -123,12 +123,11 @@ public:
 ///    ::= IDENT
 ///    ::= parList COMMA IDENT
 class ParListAST : public AST {
-  std::string Name;
-  std::unique_ptr<AST> parList;
+  std::vector<std::string>  parList;
 
 public:
-  ParListAST(std::string Name, std::unique_ptr<AST> parList)
-    : Name(Name),parList(std::move(parList)) {}
+  ParListAST(std::vector<std::string> parList)
+    : parList(std::move(parList)) {}
 };
 
 /// FuncDeclAST
