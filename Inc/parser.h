@@ -74,13 +74,11 @@ public:
 ///    ::= IDENT EQ NUMBER
 ///    ::= numberList COMMA IDENT EQ NUMBER
 class NumberListAST : public AST {
-  std::string Name;
-  float Val;
-  std::unique_ptr<AST> numberList;
+  std::vector<std::pair<std::string,int>> numberList;
 
 public:
-  NumberListAST(std::string Name,float Val,std::unique_ptr<AST> numberList)
-    : Name(Name),Val(Val),numberList(std::move(numberList)) {}
+  NumberListAST(std::vector<std::pair<std::string,int>> numberList)
+    : numberList(std::move(numberList)) {}
 };
 
 /// VarDeclAST

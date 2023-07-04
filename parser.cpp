@@ -244,31 +244,29 @@ static std::unique_ptr<AST> ParseNumberList(std::vector<std::string>& sym)
 {
     std::string name;
     int val;
+    std::vector<std::pair<std::string,int>> numberList;
 
-    if (token != tok_id) return nullptr;
-    
-    name = getTokStr();
-    token = getNextTok();
+    do {
+        if (token != tok_id) return nullptr;
 
-    add_new_symbol(name,CONST,sym);
-    if (token != tok_equal) return nullptr;
-
-    token = getNextTok();
-    if (token != tok_num) return nullptr;
-
-    val = getTokNumVal();
-    token = getNextTok();
-
-    if (token == tok_comma) {
+        name = getTokStr();
         token = getNextTok();
-        
-        auto N = ParseNumberList(sym);
-        if (!N) return nullptr;
 
-        return std::make_unique<NumberListAST>(name,val,std::move(N));
-    }
+        add_new_symbol(name,CONST,sym);
+        if (token != tok_equal) return nullptr;
 
-    return std::make_unique<NumberListAST>(name,val,nullptr);
+        token = getNextTok();
+        if (token != tok_num) return nullptr;
+
+        val = getTokNumVal();
+        numberList.push_back(std::make_pair(name,val));
+
+        token = getNextTok();
+        if (token == tok_comma) token = getNextTok();
+        else break;
+    } while(true);
+
+    return std::make_unique<NumberListAST>(numberList);
 }
 
 /// statement
