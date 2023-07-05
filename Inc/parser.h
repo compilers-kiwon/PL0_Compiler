@@ -96,12 +96,11 @@ public:
 ///    ::= IDENT
 ///    ::= identList COMMA IDENT
 class IdentListAST : public AST {
-  std::string Name;
-  std::unique_ptr<AST> identList;
+  std::vector<std::string>  identList;
 
 public:
-  IdentListAST(std::string Name,std::unique_ptr<AST> identList)
-    : Name(Name),identList(std::move(identList)) {}
+  IdentListAST(std::vector<std::string> identList)
+    : identList(std::move(identList)) {}
 };
 
 /// OptParListAST

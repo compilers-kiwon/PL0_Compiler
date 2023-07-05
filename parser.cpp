@@ -169,7 +169,8 @@ static std::unique_ptr<AST> ParseParList(std::vector<std::string>& sym)
     std::string name;
     std::vector<std::string> parList;
 
-    while (token == tok_id) {
+    do {
+        if (token != tok_id) return nullptr;
         name = getTokStr();
 
         add_new_symbol(name,VAR,sym);
@@ -177,9 +178,9 @@ static std::unique_ptr<AST> ParseParList(std::vector<std::string>& sym)
 
         if ((token=getNextTok()) != tok_comma) break;
         token = getNextTok();
-    }
+    } while (true);
 
-    return std::make_unique<ParListAST>(parList);
+    return (parList.empty())?nullptr:std::make_unique<ParListAST>(parList);
 }
 
 /// varDecl ::= VAR identList ';'
@@ -203,23 +204,20 @@ static std::unique_ptr<AST> ParseVarDecl(std::vector<std::string>& sym)
 static std::unique_ptr<AST> ParseIdentList(std::vector<std::string>& sym)
 {
     std::string name;
+    std::vector<std::string> identList;
+    
+    do {
+        if (token != tok_id) return nullptr;
+        name = getTokStr();
 
-    if (token != tok_id) return nullptr;
+        add_new_symbol(name,VAR,sym);
+        identList.push_back(name);
 
-    name = getTokStr();
-    token = getNextTok();
-
-    add_new_symbol(name,VAR,sym);
-
-    if (token == tok_comma) {
+        if ((token=getNextTok()) != tok_comma) break;
         token = getNextTok();
-        auto I = ParseIdentList(sym);
-
-        if (!I) return nullptr;
-        return std::make_unique<IdentListAST>(name,std::move(I));
-    }
-
-    return std::make_unique<IdentListAST>(name,nullptr);
+    } while (true);
+    
+    return (identList.empty())?nullptr:std::make_unique<IdentListAST>(identList);
 }
 
 /// constDecl ::= CONST numberList ';'
@@ -261,12 +259,11 @@ static std::unique_ptr<AST> ParseNumberList(std::vector<std::string>& sym)
         val = getTokNumVal();
         numberList.push_back(std::make_pair(name,val));
 
+        if ((token = getNextTok()) != tok_comma) break;
         token = getNextTok();
-        if (token == tok_comma) token = getNextTok();
-        else break;
-    } while(true);
+    } while (true);
 
-    return std::make_unique<NumberListAST>(numberList);
+    return (numberList.empty())?nullptr:std::make_unique<NumberListAST>(numberList);
 }
 
 /// statement
