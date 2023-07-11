@@ -12,7 +12,7 @@
 #include    "parser.h"
 #include    "error.h"
 
-int token;
+int token,indent;
 
 static std::unique_ptr<AST> parseProgram(void);
 static std::unique_ptr<AST> ParseBlock(void);
@@ -398,9 +398,11 @@ static std::unique_ptr<AST> ParseFactor(void)
         token = getNextTok();
         if (token != tok_lparen) {
             if (!is_available_symbol(name,VAR) &&
-                    !is_available_symbol(name,CONST)){std::cout<<name<<'\n';
-                return  printError("There is no such a variable or constant");}
-            return std::make_unique<FactorAST>(name,0.0,nullptr,nullptr);
+                    !is_available_symbol(name,CONST)) {
+                std::cout<<name<<'\n';
+                return  printError("There is no such a variable or constant");
+            }
+            return std::make_unique<FactorAST>(name,0,nullptr,nullptr,IDENT);
         }
 
         if (!is_available_symbol(name,FUNC))
@@ -412,12 +414,12 @@ static std::unique_ptr<AST> ParseFactor(void)
         if (!EL || token!=tok_rparen) return nullptr;
     
         token = getNextTok();
-        return std::make_unique<FactorAST>(name,0.0f,std::move(EL),nullptr);
+        return std::make_unique<FactorAST>(name,0,std::move(EL),nullptr,FUNC_CALL);
     }
 
     if (token == tok_num) {
         token = getNextTok();
-        return std::make_unique<FactorAST>("",getTokNumVal(),nullptr,nullptr);
+        return std::make_unique<FactorAST>("",getTokNumVal(),nullptr,nullptr,NUMBER);
     }
 
     if (token == tok_lparen) {
@@ -427,7 +429,7 @@ static std::unique_ptr<AST> ParseFactor(void)
         if(!E || token!=tok_rparen) return nullptr;
 
         token = getNextTok();
-        return std::make_unique<FactorAST>("",0.0,nullptr,std::move(E));
+        return std::make_unique<FactorAST>("",0,nullptr,std::move(E),EXPRESSION);
     }
 
     return nullptr;

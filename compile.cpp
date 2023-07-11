@@ -23,7 +23,9 @@ int compile(void)
 
     if (!P || num_of_errors!=0) {
         std::cout<<num_of_errors<<" errors!!\n";
+        return  0;
     }
 
-    return  num_of_errors<MIN_ERROR;
+    P->print();
+    return  1;
 }
