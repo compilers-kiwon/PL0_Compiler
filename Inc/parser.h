@@ -45,6 +45,7 @@ public:
     : declList(std::move(declList)), statement(std::move(statement)) {}
   void print() { 
     if (declList) declList->print();
+    indent = 0;
     if (statement) statement->print();
   }
 };
@@ -216,8 +217,6 @@ public:
     head_tok(head_tok),Name(Name),expression(std::move(expression)),condition(std::move(condition)),
     statement(std::move(statement)),stateList(std::move(stateList)) {}
   void print() {
-    int temp_indent = 0;
-
     switch (head_tok) {
       case tok_id :
         std::cout<<insert_indent(indent)<<Name<<":=";
@@ -226,21 +225,20 @@ public:
       case tok_begin :
         std::cout<<insert_indent(indent)<<"begin\n";indent++;
         if (statement) statement->print();
-        if (stateList) stateList->print();
-        indent--;std::cout<<insert_indent(indent)<<"end";
+        if (stateList) {std::cout<<";\n";stateList->print();}
+        indent--;std::cout<<'\n'<<insert_indent(indent)<<"end";
         break;
       case tok_if :
         std::cout<<insert_indent(indent)<<"if ";
         condition->print();
-        std::cout<<" then ";
-        std::swap(temp_indent,indent);
+        std::cout<<" then\n";indent++;
         statement->print();
-        std::swap(temp_indent,indent);
+        indent--;
         break;
       case tok_while :
         std::cout<<insert_indent(indent)<<"while ";
         condition->print();
-        std::cout<<" do\n";
+        std::cout<<" do\n";indent++;
         statement->print();
         break;
       case tok_ret :
@@ -273,11 +271,8 @@ public:
     std::unique_ptr<AST> statement) : stateList(std::move(stateList)),
     statement(std::move(statement)) {}
   void print() {
-    std::cout<<";\n";
-    if (statement) statement->print();
-    if (stateList) {
-      stateList->print();
-    }
+    if (statement) {statement->print();}
+    if (stateList) {std::cout<<";\n";stateList->print();}
   }
 };
 
